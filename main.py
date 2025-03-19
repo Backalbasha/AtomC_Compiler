@@ -5,7 +5,7 @@ TOKEN_SPECIFICATIONS = [
     ('KEYWORD', r'\b(break|char|double|else|for|if|int|return|struct|void|while)\b'),
     ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z0-9_]*'),
     ('NUMBER', r'\b\d+(\.\d+)?\b'),  # Integer and floating-point numbers
-    ('OPERATOR', r'(\+|-|\*|/|==|!=|<=|>=|<|>)'),
+    ('OPERATOR', r'(\+|-|\*|/|==|!=|<=|>=|<|>|=|&&|\|\||!|\.)'),
     ('DELIMITER', r'[;,{}()\[\]]'),
     ('WHITESPACE', r'\s+'),
     ('UNKNOWN', r'.')  # Catch-all for unrecognized characters
