@@ -5,7 +5,10 @@ TOKEN_SPECIFICATIONS = [
     ('COMMENT', r'//.*?\n|/\*.*?\*/'),
     ('KEYWORD', r'\b(break|char|double|else|for|if|int|return|struct|void|while)\b'),
     ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z0-9_]*'),
-    ('NUMBER', r'\b\d+(\.\d+)?\b'),  # Integer and floating-point numbers
+    ('CT_REAL', r'\b\d+(\.\d+([eE][-+]?\d+)?)|\d+[eE][-+]?\d+\b'),  # Floating-point with exponent
+    ('CT_INT', r'0[xX][0-9a-fA-F]+|\b0[0-7]*\b|\b[1-9][0-9]*\b'),  # Hex, octal, decimal
+    ('CT_CHAR', r"'(\\[abfnrtv'\"\\0]|[^'\\])'"),  # Character literals with escape sequences
+    ('CT_STRING', r'"(\\[abfnrtv\'"?\\0]|[^"\\])*"'),  # String literals
     ('OPERATOR', r'(\+|-|\*|/|==|!=|<=|>=|<|>|=|&&|\|\||!|\.)'),
     ('DELIMITER', r'[;,{}()\[\]]'),
     ('WHITESPACE', r'\s+'),
@@ -107,29 +110,31 @@ def parse_var_declaration(tokens):
 
 def parse_variable_list(tokens):
     """Parses a comma-separated list of variables."""
-    #get first variable before assignment and assignmnet
+    #get first variable before assignment an assignmnet
     global current_index
     if not match(tokens, "IDENTIFIER"):
         raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name, got {current_token(tokens)}")
     consume(tokens, "IDENTIFIER")  # Consume variable name
     if match(tokens, "OPERATOR") and current_token(tokens)[1] == "=":
-        consume(tokens, "OPERATOR")  # Consume `=`
-    while True:
+        consume(tokens, "OPERATOR")  # Consume `=`\
+        parse_expression(tokens)
+        #while True:
+            #if not parse_expression(tokens):
+                #raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected expression, got {current_token(tokens)}")
 
-        if not parse_expression(tokens):
-            raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected expression, got {current_token(tokens)}")
-
-        if match(tokens, "DELIMITER") and current_token(tokens)[1] == ",":
-            consume(tokens, "DELIMITER")  # Consume `,` and continue parsing the next variable
-        elif match(tokens, "DELIMITER") and current_token(tokens)[1] == ";":
-            consume(tokens, "DELIMITER")  # Consume `;` and stop parsing
-            break
-        else:
-            raise SyntaxError(f"Line {current_token(tokens)[2]}: Unexpected token {current_token(tokens)}")
+    if match(tokens, "DELIMITER") and current_token(tokens)[1] == ",":
+        print (f"Before consuming: {tokens[current_index][1]}")
+        consume(tokens, "DELIMITER")  # Consume `,` and continue parsing the next variable
+        print(f"After consuming: {tokens[current_index][1]}")
+        parse_variable_list(tokens)
+    elif match(tokens, "DELIMITER") and current_token(tokens)[1] == ";":
+        consume(tokens, "DELIMITER")  # Consume `;` and stop parsing
+    else:
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Unexpected token {current_token(tokens)}")
 def parse_expression(tokens):
     """Parses an expression like `speed + 10 / 2`."""
     global current_index
-    print("FUnction called")
+    print("Function called")
     print(tokens[current_index])
 
     if match (tokens, "IDENTIFIER"):
@@ -180,13 +185,24 @@ def if_statement_parse (tokens):
     if tokens[current_index][1] != '{':
         raise SyntaxError("Expected {")
     consume(tokens, "DELIMITER")
+
     #content from if statement
     parse_variable_list(tokens)
 
     if tokens[current_index][1] != '}':
         raise SyntaxError("Expected }")
     consume(tokens, "DELIMITER")
+    if tokens[current_index][1] == "else":
+        consume(tokens, "KEYWORD")
+        if tokens[current_index][1] != '{':
+            raise SyntaxError("Expected {")
+        consume(tokens, 'DELIMITER')
+        #content from else statement
+        parse_var_declaration(tokens)
 
+        if tokens[current_index][1] != '}':
+            raise SyntaxError("Expected }")
+        consume(tokens, 'DELIMITER')
 
 
 # Example usage
@@ -197,20 +213,22 @@ if __name__ == "__main__":
     token_list = tokenize(code)
     for token in token_list:
         print(token)
-    print(type(token_list))
-    print (type(token_list[0][0]))
+    #print(type(token_list))
+    #print (type(token_list[0][0]))
     #print (consume1(token_list, "KEYWORD"))
     token_list_clone = token_list
     #parser = Parser(token_list)
     #parser.parse_var_declaration()
 
-    print (token_list [current_index])
+    #print (token_list [current_index])
 
     #parse_condition(token_list)
     #parse_expression(token_list)
     #parse_var_declaration(token_list)
-    parse_var_declaration(token_list)
-    if_statement_parse(token_list)
 
+    #parse_var_declaration(token_list)
+    #if_statement_parse(token_list)
+
+    print('\nfinished')
     print (token_list[current_index])
 
