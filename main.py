@@ -70,12 +70,15 @@ def parse_program (tokens, exit_token):
         if token_value == exit_token:
             print ("\n\nExiting\n\n")
             break
-        elif token_type == "KEYWORD" and token_value in ["int", "char", "double"]:
-            parse_var_declaration(tokens)
+        elif token_type == "KEYWORD" and token_value in ["int", "char", "double", "void"]:
+            if not parse_function(tokens):
+                parse_var_declaration(tokens)
         elif token_type == "KEYWORD" and token_value == "if":
             if_statement_parse(tokens)
+        elif token_type == "KEYWORD" and token_value == "while":
+            while_statement_parse(tokens)
         elif token_type == "IDENTIFIER":
-            parse_expression(tokens)  # Could be assignment or standalone expression
+            parse_variable_list(tokens)  # Could be assignment or standalone expression
         elif token_type == "DELIMITER" and token_value == ";":
             consume(tokens, "DELIMITER")  # Skip standalone semicolons (empty statements)
         else:
@@ -102,6 +105,66 @@ def match(tokens, expected_type):
     #return current_token(tokens)[current_index] == expected_type
     return tokens[current_index][0] == expected_type
 
+def parse_function(tokens):
+    """Parses a function declaration like `int main() { ... }`."""
+    global current_index
+    clone_current_index = current_index
+    if tokens[current_index][1] not in ["int", "char", "double", "void"]:
+        return False
+    if current_index + 2 <= len(tokens) and tokens[current_index][1] == "void" and  (tokens[current_index+1][0] != "IDENTIFIER" or tokens[current_index+2][1] != "("): #checks if void function is correct since I can't declare a variable with void
+        raise SyntaxError (f"Void function syntax error {tokens[current_index][2]}")
+    consume(tokens, "KEYWORD")
+    if tokens[current_index][0] != "IDENTIFIER":
+        current_index = clone_current_index #restore the index
+        return False
+    consume(tokens, "IDENTIFIER")  # Consume function name
+    if tokens[current_index][1] != "(":
+        current_index = clone_current_index
+        return False #restore the index
+    consume(tokens, "DELIMITER")  # Consume `(`
+
+     # Check for parameters (optional)
+    parse_function_parameters(tokens)
+
+    if tokens[current_index][1] != ")":
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ), got {current_token(tokens)}")
+    consume(tokens, "DELIMITER")  # Consume `)`
+    if tokens[current_index][1] != "{":
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected {{, got {current_token(tokens)}")
+    consume(tokens, "DELIMITER")  # Consume `{`
+
+    # Parse function body
+    parse_program(tokens, "}")  # } is the exit token
+
+    if tokens[current_index][1] != "}":
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected }}, got {current_token(tokens)}")
+    consume(tokens, "DELIMITER")  # Consume `}`
+    print("✅ Function parsed successfully!")
+    return True
+
+def parse_function_parameters(tokens):
+    """Parses function parameters like `int a, char b`."""
+    global current_index
+    if tokens[current_index][1] == ")":
+        return True
+    if tokens[current_index][1] not in ["int", "char", "double"]:
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected type keyword, got {current_token(tokens)}")
+    consume(tokens, "KEYWORD")
+    if tokens[current_index][0] != "IDENTIFIER":
+        raise  SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name, got {current_token(tokens)}")
+    consume(tokens, "IDENTIFIER")
+    while tokens[current_index][1] == ',':
+        consume(tokens, "DELIMITER")
+        if tokens[current_index][1] not in ["int", "char", "double"]:
+            raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected type keyword, got {current_token(tokens)}")
+        consume(tokens, "KEYWORD")
+        if tokens[current_index][0] != "IDENTIFIER":
+            raise  SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name, got {current_token(tokens)}")
+        consume(tokens, "IDENTIFIER")
+    if tokens[current_index][1] != ")":
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ), got {current_token(tokens)}")
+
+
 
 def parse_var_declaration(tokens):
     """Parses variable declarations like `int speed = 70, a, b = 5;`"""
@@ -121,7 +184,36 @@ def parse_variable_list(tokens):
         print(f"Next token: {tokens[current_index+1][1]}")
         raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name, got {current_token(tokens)}")
     consume(tokens, "IDENTIFIER")  # Consume variable name
-    if match(tokens, "OPERATOR") and current_token(tokens)[1] == "=":
+    #check if it is a vector
+    if match(tokens, "DELIMITER") and current_token(tokens)[1] == "[":
+        consume(tokens, "DELIMITER")
+        if tokens[current_index][0] != "CT_INT":
+            raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected number, got {current_token(tokens)}")
+        consume(tokens, "CT_INT")
+        if tokens[current_index][1] != "]":
+            raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ], got {current_token(tokens)}")
+        consume(tokens, "DELIMITER")
+        if tokens[current_index][1] == "=":
+            consume(tokens, "OPERATOR")
+            if tokens[current_index][0] in  ["CT_INT", "CT_REAL", "IDENTIFIER"] :
+                print ("bbbbbb")
+                consume(tokens, tokens[current_index][0])
+            elif tokens[current_index][1] == "{":
+                consume(tokens, "DELIMITER")
+                if tokens[current_index][1] == "}":
+                    consume(tokens, "DELIMITER")
+                else:
+                    parse_expression(tokens)
+                    while tokens[current_index][1] == ",":
+                        consume(tokens, "DELIMITER")
+                        parse_expression(tokens)
+                    if tokens[current_index][1] != "}":
+                        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected }}, got {current_token(tokens)}")
+                    consume(tokens, "DELIMITER")
+            else:
+                raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected {{, got {current_token(tokens)}")
+    #vector check is over
+    elif match(tokens, "OPERATOR") and current_token(tokens)[1] == "=":
         consume(tokens, "OPERATOR")  # Consume `=`\
         parse_expression(tokens)
 
@@ -142,7 +234,21 @@ def parse_expression(tokens):
     print(tokens[current_index])
 
     if match (tokens, "IDENTIFIER"):
-        consume(tokens, "IDENTIFIER")
+        if len(tokens) < current_index + 1 and tokens[current_index + 1][1] == "[":
+            #it should be a vector
+            consume(tokens, "IDENTIFIER")
+            consume(tokens, "DELIMITER")
+            if tokens[current_index][0] == "CT_INT":
+                consume(tokens, "CT_INT")
+            elif tokens[current_index][0] == "IDENTIFIER":
+                consume(tokens, "IDENTIFIER")
+            else:
+                raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name or number, got {current_token(tokens)}")
+            if tokens[current_index][1] != "]":
+                raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ], got {current_token(tokens)}")
+            consume(tokens, "DELIMITER")
+        else:
+            consume(tokens, "IDENTIFIER")
     elif match (tokens, "CT_INT"):
         consume(tokens, "CT_INT")
     else:
@@ -228,13 +334,14 @@ def while_statement_parse (tokens):
         raise SyntaxError("Expected {")
     consume(tokens, "DELIMITER")
 
-    #content from while statement
+    #content from if statement
+    #parse_variable_list(tokens)
     #parse_var_declaration(tokens)
     parse_program(tokens, "}")
 
     if tokens[current_index][1] != '}':
         raise SyntaxError("Expected }")
-    consume(tokens, 'DELIMITER')
+    consume(tokens, "DELIMITER")
 
 
 # Example usage
@@ -247,6 +354,7 @@ if __name__ == "__main__":
     token_list = tokenize(code)
     for token in token_list:
         print(token)
+    print (f"Total tokens: {len(token_list)}")
     #print(type(token_list))
     #print (type(token_list[0][0]))
     #print (consume1(token_list, "KEYWORD"))
