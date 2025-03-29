@@ -61,13 +61,16 @@ def current_token(tokens):
     """Returns the current token type, value, and line number."""
     return tokens[current_index] if current_index < len(tokens) else ("EOF", None, None)
 
-def parse_program (tokens):
+def parse_program (tokens, exit_token):
     """Parses the entire program."""
     global  current_index
+    print(f"Parsing program with current token: {current_token(tokens)}")
     while current_index < len(tokens):
         token_type, token_value, line_number = current_token(tokens)
-
-        if token_type == "KEYWORD" and token_value in ["int", "char", "double"]:
+        if token_value == exit_token:
+            print ("\n\nExiting\n\n")
+            break
+        elif token_type == "KEYWORD" and token_value in ["int", "char", "double"]:
             parse_var_declaration(tokens)
         elif token_type == "KEYWORD" and token_value == "if":
             if_statement_parse(tokens)
@@ -75,9 +78,11 @@ def parse_program (tokens):
             parse_expression(tokens)  # Could be assignment or standalone expression
         elif token_type == "DELIMITER" and token_value == ";":
             consume(tokens, "DELIMITER")  # Skip standalone semicolons (empty statements)
-        elif token_type == "EOF":
-            break
         else:
+            if tokens[current_index][0] == "EOF":
+                break
+            print (f"Exit token: {exit_token} token is : {tokens[current_index][0]}")
+            #print(f"Current token: {token_value} {tokens[current_index+1][1]} {tokens[current_index+2][1]} {tokens[current_index+3][1]}")
             raise SyntaxError(f"Line {line_number}: Unexpected token {token_value}")
 
     print("✅ Parsing completed successfully!")
@@ -113,14 +118,12 @@ def parse_variable_list(tokens):
     #get first variable before assignment an assignmnet
     global current_index
     if not match(tokens, "IDENTIFIER"):
+        print(f"Next token: {tokens[current_index+1][1]}")
         raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name, got {current_token(tokens)}")
     consume(tokens, "IDENTIFIER")  # Consume variable name
     if match(tokens, "OPERATOR") and current_token(tokens)[1] == "=":
         consume(tokens, "OPERATOR")  # Consume `=`\
         parse_expression(tokens)
-        #while True:
-            #if not parse_expression(tokens):
-                #raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected expression, got {current_token(tokens)}")
 
     if match(tokens, "DELIMITER") and current_token(tokens)[1] == ",":
         print (f"Before consuming: {tokens[current_index][1]}")
@@ -128,6 +131,7 @@ def parse_variable_list(tokens):
         print(f"After consuming: {tokens[current_index][1]}")
         parse_variable_list(tokens)
     elif match(tokens, "DELIMITER") and current_token(tokens)[1] == ";":
+        print(f"Consuming ; {tokens[current_index][0]}")
         consume(tokens, "DELIMITER")  # Consume `;` and stop parsing
     else:
         raise SyntaxError(f"Line {current_token(tokens)[2]}: Unexpected token {current_token(tokens)}")
@@ -139,8 +143,8 @@ def parse_expression(tokens):
 
     if match (tokens, "IDENTIFIER"):
         consume(tokens, "IDENTIFIER")
-    elif match (tokens, "NUMBER"):
-        consume(tokens, "NUMBER")
+    elif match (tokens, "CT_INT"):
+        consume(tokens, "CT_INT")
     else:
         raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name or number, got {current_token(tokens)}")
     print (tokens[current_index][1])
@@ -187,7 +191,9 @@ def if_statement_parse (tokens):
     consume(tokens, "DELIMITER")
 
     #content from if statement
-    parse_variable_list(tokens)
+    #parse_variable_list(tokens)
+    #parse_var_declaration(tokens)
+    parse_program(tokens, "}")
 
     if tokens[current_index][1] != '}':
         raise SyntaxError("Expected }")
@@ -198,14 +204,42 @@ def if_statement_parse (tokens):
             raise SyntaxError("Expected {")
         consume(tokens, 'DELIMITER')
         #content from else statement
-        parse_var_declaration(tokens)
+
+        #parse_var_declaration(tokens)
+        parse_program(tokens, "}")
 
         if tokens[current_index][1] != '}':
             raise SyntaxError("Expected }")
         consume(tokens, 'DELIMITER')
 
+def while_statement_parse (tokens):
+    global current_index
+    if tokens[current_index][1] != "while":
+        return False
+    consume(tokens, "KEYWORD")
+    if tokens[current_index][1] != '(':
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected (, got {current_token(tokens)}")
+    consume(tokens, "DELIMITER")
+    parse_condition(tokens)
+    if tokens[current_index][1] != ')':
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ), got {current_token(tokens)}")
+    consume(tokens, "DELIMITER")
+    if tokens[current_index][1] != '{':
+        raise SyntaxError("Expected {")
+    consume(tokens, "DELIMITER")
+
+    #content from while statement
+    #parse_var_declaration(tokens)
+    parse_program(tokens, "}")
+
+    if tokens[current_index][1] != '}':
+        raise SyntaxError("Expected }")
+    consume(tokens, 'DELIMITER')
+
 
 # Example usage
+
+#******* syntactic functions should be of 2 types: those that consume the token and those that don't or bool type and error message type if not correct
 if __name__ == "__main__":
     with open("input.c", 'r') as file:
         code = file.read()
@@ -228,7 +262,8 @@ if __name__ == "__main__":
 
     #parse_var_declaration(token_list)
     #if_statement_parse(token_list)
-
+    #if_statement_parse(token_list)
+    parse_program(token_list, "EOF")
     print('\nfinished')
     print (token_list[current_index])
 
