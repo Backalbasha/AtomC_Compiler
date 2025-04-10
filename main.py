@@ -2,7 +2,7 @@ import re
 
 # Define token types
 TOKEN_SPECIFICATIONS = [
-    ('COMMENT', r'//.*?\n|/\*.*?\*/'),
+    ('COMMENT', r'//.*?(?:\n|\Z)|/\*.*?\*/'),
     ('KEYWORD', r'\b(break|char|double|else|for|if|int|return|struct|void|while)\b'),
     ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z0-9_]*'),
     ('CT_REAL', r'\b\d+(\.\d+([eE][-+]?\d+)?)|\d+[eE][-+]?\d+\b'),  # Floating-point with exponent

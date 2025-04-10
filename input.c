@@ -38,13 +38,14 @@ else {
     a, b, c, function (2, 3);
     hawk_tuah( pdsafgsadg, 2, 3);
 }
-
-
+//sfarsit
 /*
 a = 3.454
 2345
 "ceva"
 0x1F34
-0345
+0345 //comment like this : //dsgfdhgfh
+0x1F34           on last line bug
  1.23e-4
  .*/
+ //sagdfshgfh
