@@ -30,7 +30,7 @@ if(speed == 100){
 else {
     // Do something else
     int cont3 = 0;
-    int v[30] = 5; //not great..
+    v[30] = 5;
     int v[5] = { 1, 2, 3, 4, 5 };
     v[0] = 10;
     int cont4 = 0xFF23;
@@ -38,6 +38,7 @@ else {
     a, b, c, function (2, 3);
     hawk_tuah( pdsafgsadg, 2, 3);
 }
+
 //sfarsit
 /*
 a = 3.454
