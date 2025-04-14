@@ -39,6 +39,26 @@ else {
     hawk_tuah( pdsafgsadg, 2, 3);
 }
 
+int sum()
+{
+	int	 i,v[5],s;
+	s=0;
+	for(;;){
+		v[4]=i;
+		s=s+v[i];
+		}
+}
+
+void main()
+{
+	int		i,s;
+	for(;;){
+	}
+	s=sum();
+	put_i(s);
+}
+
+
 //sfarsit
 /*
 a = 3.454

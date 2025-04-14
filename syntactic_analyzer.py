@@ -18,6 +18,8 @@ def parse_program(tokens, exit_token):
             if_statement_parse(tokens)
         elif token_type == "KEYWORD" and token_value == "while":
             while_statement_parse(tokens)
+        elif token_type == "KEYWORD" and token_value == "for":
+            parse_for_loop(tokens)
         elif token_type == "IDENTIFIER":
             parse_variable_list(tokens)  # Could be assignment or standalone expression
         elif token_type == "DELIMITER" and token_value == ";":
@@ -43,18 +45,21 @@ def consume(tokens, expected_type):
 def parse_function_call_parameters(tokens):
     global current_index
     while tokens[current_index][1] != ")":
+        '''
         if tokens[current_index][0] == "IDENTIFIER":
             consume(tokens, "IDENTIFIER")
         elif tokens[current_index][0] == "CT_INT":
             consume(tokens, "CT_INT")
         elif tokens[current_index][0] == "CT_REAL":
             consume(tokens, "CT_REAL")
-        elif tokens[current_index][0] == "CT_STRING":
+        '''
+        if tokens[current_index][0] == "CT_STRING":
             consume(tokens, "CT_STRING")
         elif tokens[current_index][0] == "CT_CHAR":
             consume(tokens, "CT_CHAR")
         else:
-            raise SyntaxError(f"Line {tokens[current_index][2]}: Unexpected token {tokens[current_index]}")
+            parse_expression(tokens)
+            #raise SyntaxError(f"Line {tokens[current_index][2]}: Unexpected token {tokens[current_index]}")
         if tokens[current_index][1] == ")":
             break
         elif tokens[current_index][1] == ",":
@@ -168,6 +173,8 @@ def parse_program_function(tokens, exit_token):
             if_statement_parse(tokens)
         elif token_type == "KEYWORD" and token_value == "while":
             while_statement_parse(tokens)
+        elif token_type == "KEYWORD" and token_value == "for":
+            parse_for_loop(tokens)
         elif token_type == "IDENTIFIER":
             parse_variable_list(tokens)
         elif token_type == "DELIMITER" and token_value == ";":
@@ -177,6 +184,34 @@ def parse_program_function(tokens, exit_token):
                 break
             raise SyntaxError(f"Line {line_number}: Unexpected token {token_value}")
 
+def parse_for_loop(tokens):
+    """Parses a for loop."""
+    global current_index
+    if tokens[current_index][1] != "for":
+        return False
+    consume(tokens, "KEYWORD")
+    if tokens[current_index][1] != '(':
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected (, got {tokens[current_index]}")
+    consume(tokens, "DELIMITER")
+    #parse_variable_list_in_var_declaration(tokens)
+    if tokens[current_index][1] != ';':
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ;, got {tokens[current_index]}")
+    consume(tokens, "DELIMITER")
+    #parse_condition(tokens)
+    if tokens[current_index][1] != ';':
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ;, got {tokens[current_index]}")
+    consume(tokens, "DELIMITER")
+    #parse_expression(tokens)
+    if tokens[current_index][1] != ')':
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ), got {tokens[current_index]}")
+    consume(tokens, "DELIMITER")
+    if tokens[current_index][1] != '{':
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected {{, got {tokens[current_index]}")
+    consume(tokens, "DELIMITER")
+    parse_program(tokens, '}')
+    if tokens[current_index][1] != '}':
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected }}, got {tokens[current_index]}")
+    consume(tokens, "DELIMITER")
 
 def parse_var_declaration(tokens):
     """Parses variable declarations like `int speed = 70, a, b = 5;`"""
@@ -325,6 +360,8 @@ def parse_expression(tokens):
             consume(tokens, "IDENTIFIER")
     elif tokens[current_index][0] == "CT_INT":
         consume(tokens, "CT_INT")
+    elif tokens[current_index][0] == "CT_REAL":
+        consume(tokens, "CT_REAL")
     else:
         raise SyntaxError(
             f"Line {tokens[current_index][2]}: Expected variable name or number, got {tokens[current_index]}")
