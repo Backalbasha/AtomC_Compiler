@@ -43,19 +43,20 @@ int sum()
 {
 	int	 i,v[5],s;
 	s=0;
-	for(;;){
-		v[4]=i;
+	for(i=0;i<5;i=i+1){
+		v[0]=i;
 		s=s+v[i];
 		}
+	//return s;
 }
 
 void main()
 {
 	int		i,s;
-	for(;;){
-	}
-	s=sum();
-	put_i(s);
+	for(6 = chestie[5].x;i<1000000;i= (i+1) * 3){
+        s=sum();
+        put_i(s);
+    }
 }
 
 

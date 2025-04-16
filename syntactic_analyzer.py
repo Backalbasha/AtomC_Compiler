@@ -33,14 +33,184 @@ def parse_program(tokens, exit_token):
     print("✅ Parsing completed successfully!")
 
 
-def consume(tokens, expected_type):
-    """Consumes the expected token and moves to the next one."""
+def consume(tokens, expected_type, expected_value=None):
     global current_index
-    token_type, token_value, line_number = tokens[current_index]
-    if token_type == expected_type:
+    if current_index >= len(tokens):
+        return False
+    token_type, token_value, _ = tokens[current_index]
+    if token_type == expected_type and (expected_value is None or token_value == expected_value):
         current_index += 1
-        return token_value
-    raise SyntaxError(f"Line {line_number}: Expected {expected_type}, got {token_type}")
+        return True
+    return False
+
+def expr(tokens):
+    return exprAssign(tokens)
+
+def exprAssign(tokens):
+    global current_index
+    start_index = current_index
+
+    if exprOr(tokens):  # Try left-hand side
+        if consume(tokens, "OPERATOR", "="):
+            if exprAssign(tokens):
+                return True
+            else:
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Invalid expression after '='")
+        return True  # Just an OR-expression, not assignment
+    current_index = start_index
+    return False
+def exprOr(tokens):
+    global current_index
+    if not exprAnd(tokens):
+        return False
+    while consume(tokens, "OPERATOR", "||"):
+        if not exprAnd(tokens):
+            raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression after '||'")
+    return True
+
+def exprAnd(tokens):
+    global current_index
+    if not exprEq(tokens):
+        return False
+    while consume(tokens, "OPERATOR", "&&"):
+        if not exprEq(tokens):
+            raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression after '&&'")
+    return True
+
+def exprEq(tokens):
+    global current_index
+    if not exprRel(tokens):
+        return False
+    while True:
+        if consume(tokens, "OPERATOR", "==") or consume(tokens, "OPERATOR", "!="):
+            if not exprRel(tokens):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression after equality operator")
+        else:
+            break
+    return True
+
+def exprRel(tokens):
+    global current_index
+    if not exprAdd(tokens):
+        return False
+    while True:
+        if consume(tokens, "OPERATOR", "<") or consume(tokens, "OPERATOR", "<=") or \
+           consume(tokens, "OPERATOR", ">") or consume(tokens, "OPERATOR", ">="):
+            if not exprAdd(tokens):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression after relational operator")
+        else:
+            break
+    return True
+
+def exprAdd(tokens):
+    global current_index
+    if not exprMul(tokens):
+        return False
+    while True:
+        if consume(tokens, "OPERATOR", "+") or consume(tokens, "OPERATOR", "-"):
+            if not exprMul(tokens):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression after '+' or '-'")
+        else:
+            break
+    return True
+
+def exprMul(tokens):
+    global current_index
+    if not exprCast(tokens):  # You can later change to exprCast if needed
+        return False
+    while True:
+        if consume(tokens, "OPERATOR", "*") or consume(tokens, "OPERATOR", "/"):
+            if not exprPrimary(tokens):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression after '*' or '/'")
+        else:
+            break
+    return True
+
+def exprCast(tokens):
+    global current_index
+    start_index = current_index
+
+    if consume(tokens, "DELIMITER", "("):
+        if typeName(tokens):  # You'll need to implement this
+            if consume(tokens, "DELIMITER", ")"):
+                if exprCast(tokens):
+                    return True
+                else:
+                    raise SyntaxError(f"Line {tokens[current_index][2]}: Invalid expression after cast")
+            else:
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Missing ')' after type name")
+        else:
+            current_index = start_index  # Not a type cast — backtrack
+    return exprUnary(tokens)
+
+def exprUnary(tokens):
+    global current_index
+    if consume(tokens, "OPERATOR", "-") or consume(tokens, "OPERATOR", "!"):
+        if not exprUnary(tokens):
+            raise SyntaxError(f"Line {tokens[current_index][2]}: Invalid operand for unary operator")
+        return True
+    return exprPostfix(tokens)
+
+def exprPostfix(tokens):
+    global current_index
+    if not exprPrimary(tokens):
+        return False
+
+    while True:
+        if consume(tokens, "DELIMITER", "["):  # array indexing
+            if not expr(tokens):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Missing expression inside []")
+            if not consume(tokens, "DELIMITER", "]"):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Missing ']'")
+        elif consume(tokens, "OPERATOR", "."):  # struct access
+            if not consume(tokens, "IDENTIFIER"):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Expected field name after '.'")
+        else:
+            break
+    return True
+
+def exprPrimary(tokens):
+    global current_index
+    if consume(tokens, "IDENTIFIER"):
+        if consume(tokens, "DELIMITER", "("):  # function call
+            if expr(tokens):
+                while consume(tokens, "DELIMITER", ","):
+                    if not expr(tokens):
+                        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected argument expression after ','")
+            if not consume(tokens, "DELIMITER", ")"):
+                raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ')' after arguments")
+        return True
+    elif consume(tokens, "CT_INT") or consume(tokens, "CT_REAL") or \
+         consume(tokens, "CT_CHAR") or consume(tokens, "CT_STRING"):
+        return True
+    elif consume(tokens, "DELIMITER", "("):
+        if not expr(tokens):
+            raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression inside parentheses")
+        if not consume(tokens, "DELIMITER", ")"):
+            raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ')' after expression")
+        return True
+    return False
+
+def typeName(tokens):
+    if not typeBase(tokens):
+        return False
+    #arrayDecl(tokens)  # optional, you could check its result if needed
+    return True
+
+def typeBase(tokens):
+    global current_index
+    if consume(tokens, "KEYWORD", "int") or \
+       consume(tokens, "KEYWORD", "double") or \
+       consume(tokens, "KEYWORD", "char"):
+        return True
+    if consume(tokens, "KEYWORD", "struct"):
+        if not consume(tokens, "IDENTIFIER"):
+            raise SyntaxError(f"Line {tokens[current_index][2]}: Expected struct name")
+        return True
+    return False
+
+
+
 
 def parse_function_call_parameters(tokens):
     global current_index
@@ -193,15 +363,18 @@ def parse_for_loop(tokens):
     if tokens[current_index][1] != '(':
         raise SyntaxError(f"Line {tokens[current_index][2]}: Expected (, got {tokens[current_index]}")
     consume(tokens, "DELIMITER")
-    #parse_variable_list_in_var_declaration(tokens)
+    if tokens[current_index][1] != ';':
+        expr(tokens)
     if tokens[current_index][1] != ';':
         raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ;, got {tokens[current_index]}")
     consume(tokens, "DELIMITER")
-    #parse_condition(tokens)
+    if tokens[current_index][1] != ';':
+        expr(tokens)
     if tokens[current_index][1] != ';':
         raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ;, got {tokens[current_index]}")
     consume(tokens, "DELIMITER")
-    #parse_expression(tokens)
+    if tokens[current_index][1] != ')':
+        expr(tokens)
     if tokens[current_index][1] != ')':
         raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ), got {tokens[current_index]}")
     consume(tokens, "DELIMITER")
