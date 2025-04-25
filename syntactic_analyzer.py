@@ -2,6 +2,188 @@ current_index = 0  # Track token position
 
 TYPES = ["CT_INT",  "CT_REAL", "CT_STRING", "CT_CHAR"]  # Supported types
 
+
+# ---------- Token Helpers ----------
+
+def current_token(tokens):
+    global current_index
+    return tokens[current_index] if current_index < len(tokens) else ("EOF", "EOF", -1)
+
+
+# ---------- Grammar Parsing Functions ----------
+def is_function_declaration(tokens):
+    # Look ahead: type ID ( = function
+    if current_index + 2 < len(tokens):
+        # Type should already be consumed; check for ID and then (
+        return tokens[current_index][0] == "IDENTIFIER" and \
+               tokens[current_index + 1][1] == "("
+    return False
+
+
+def parse_unit(tokens):
+    global current_index
+
+    while current_token(tokens)[0] != "END":
+        # Check for struct declaration
+        if tokens[current_index][0] == "KEYWORD" and tokens[current_index][1] == "struct":
+            parse_decl_struct(tokens)
+
+        # Check for typeBase: int, double, char, struct ID
+        elif tokens[current_index][0] == "KEYWORD" and tokens[current_index][1] in ["int", "char", "double", "void"]:
+            # Peek ahead to determine if it's a function or a variable
+            if (current_index + 2 < len(tokens) and
+                tokens[current_index + 1][0] == "IDENTIFIER" and
+                tokens[current_index + 2][0] == "DELIMITER" and
+                tokens[current_index + 2][1] == "("):
+                parse_decl_func(tokens)
+            else:
+                parse_decl_var(tokens)
+
+        # Check for "struct ID" typeBase
+        elif (tokens[current_index][0] == "KEYWORD" and tokens[current_index][1] == "struct" and
+              current_index + 1 < len(tokens) and tokens[current_index + 1][0] == "IDENTIFIER"):
+            # Same peek-ahead trick for struct type followed by function or variable
+            if (current_index + 3 < len(tokens) and
+                tokens[current_index + 2][0] == "DELIMITER" and
+                tokens[current_index + 2][1] == "("):
+                parse_decl_func(tokens)
+            else:
+                parse_decl_var(tokens)
+
+        else:
+            raise SyntaxError(f"Line {current_token(tokens)[2]}: Unexpected token {current_token(tokens)}")
+
+    consume(tokens, "END")
+    print("✅ Program parsed successfully!")
+
+
+def parse_decl_struct(tokens):
+    if not consume(tokens, "KEYWORD", "struct"):
+        return False
+    if not consume(tokens, "IDENTIFIER"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected struct name")
+    if not consume(tokens, "DELIMITER", "{"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected '{{'")
+    while parse_decl_var(tokens):
+        pass
+    if not consume(tokens, "DELIMITER", "}"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected '}}'")
+    if not consume(tokens, "DELIMITER", ";"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ';'")
+    return True
+
+def parse_decl_var(tokens):
+    if not parse_type_base(tokens):
+        return False
+    if not consume(tokens, "IDENTIFIER"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name")
+    parse_array_decl(tokens)
+    while consume(tokens, "DELIMITER", ","):
+        if not consume(tokens, "IDENTIFIER"):
+            raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected variable name after ','")
+        parse_array_decl(tokens)
+    if not consume(tokens, "DELIMITER", ";"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ';' at end of declaration")
+    return True
+
+def parse_type_base(tokens):
+    if consume(tokens, "KEYWORD", "int") or \
+       consume(tokens, "KEYWORD", "double") or \
+       consume(tokens, "KEYWORD", "char"):
+        return True
+    if consume(tokens, "KEYWORD", "struct"):
+        if not consume(tokens, "IDENTIFIER"):
+            raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected struct name")
+        return True
+    return False
+
+def parse_array_decl(tokens):
+    if not consume(tokens, "DELIMITER", "["):
+        return False
+    expr(tokens)  # Optional
+    if not consume(tokens, "DELIMITER", "]"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ']'")
+    return True
+
+def parse_decl_func(tokens):
+    if consume(tokens, "KEYWORD", "void"):
+        pass
+    elif parse_type_base(tokens):
+        consume(tokens, "OPERATOR", "*")  # optional
+    else:
+        return False
+    if not consume(tokens, "IDENTIFIER"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected function name")
+    if not consume(tokens, "DELIMITER", "("):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected '('")
+    if parse_func_arg(tokens):
+        while consume(tokens, "DELIMITER", ","):
+            if not parse_func_arg(tokens):
+                raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected argument")
+    if not consume(tokens, "DELIMITER", ")"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected ')'")
+    parse_stm_compound(tokens)
+    return True
+
+def parse_func_arg(tokens):
+    if not parse_type_base(tokens):
+        return False
+    if not consume(tokens, "IDENTIFIER"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected argument name")
+    parse_array_decl(tokens)
+    return True
+
+def parse_stm(tokens):
+    if parse_stm_compound(tokens):
+        return True
+    elif consume(tokens, "KEYWORD", "if"):
+        if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Missing '(' after if")
+        if not expr(tokens): raise SyntaxError("Invalid expression in if")
+        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Missing ')' after if condition")
+        parse_stm(tokens)
+        if consume(tokens, "KEYWORD", "else"):
+            parse_stm(tokens)
+        return True
+    elif consume(tokens, "KEYWORD", "while"):
+        if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Missing '(' after while")
+        if not expr(tokens): raise SyntaxError("Invalid expression in while")
+        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Missing ')' after while condition")
+        parse_stm(tokens)
+        return True
+    elif consume(tokens, "KEYWORD", "for"):
+        if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Missing '(' after for")
+        expr(tokens)
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Missing first ';' in for")
+        expr(tokens)
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Missing second ';' in for")
+        expr(tokens)
+        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Missing ')' in for")
+        parse_stm(tokens)
+        return True
+    elif consume(tokens, "KEYWORD", "break"):
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Missing ';' after break")
+        return True
+    elif consume(tokens, "KEYWORD", "return"):
+        expr(tokens)  # optional
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Missing ';' after return")
+        return True
+    else:
+        expr(tokens)  # optional
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Missing ';'")
+        return True
+
+def parse_stm_compound(tokens):
+    if not consume(tokens, "DELIMITER", "{"):
+        return False
+    while True:
+        if parse_decl_var(tokens) or parse_stm(tokens):
+            continue
+        break
+    if not consume(tokens, "DELIMITER", "}"):
+        raise SyntaxError(f"Line {current_token(tokens)[2]}: Expected '}}'")
+    return True
+
+
 def parse_program(tokens, exit_token):
     """Parses the entire program."""
     global current_index
@@ -394,6 +576,8 @@ def parse_var_declaration(tokens):
     consume(tokens, "KEYWORD")  # Consume type
     parse_variable_list_in_var_declaration(tokens)
     print("✅ Variable declaration parsed successfully!")
+
+
 
 def parse_variable_list_in_var_declaration(tokens):
     """Parses a comma-separated list of variables."""
