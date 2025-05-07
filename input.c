@@ -1,5 +1,5 @@
-
-
+struct Point { int x, y; };
+int x, f3;
 a = b + 5, c= 1 + 3;
 int speed, speed2 ;
 int function (int a, int b){

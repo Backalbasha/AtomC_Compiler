@@ -9,57 +9,62 @@ def current_token(tokens):
     global current_index
     return tokens[current_index] if current_index < len(tokens) else ("EOF", "EOF", -1)
 
-
 # ---------- Grammar Parsing Functions ----------
 def parse_unit(tokens):
     global current_index
-    while current_token(tokens)[0] != "END":
-        if current_token(tokens)[0] == "KEYWORD" and current_token(tokens)[1] == "struct":
-            if not parse_decl_struct(tokens):
-                raise SyntaxError("Invalid struct declaration")
-        elif current_token(tokens)[0] == "KEYWORD" and current_token(tokens)[1] in ["int", "char", "double", "void"]:
-            if is_func_decl(tokens):
-                if not parse_decl_func(tokens):
-                    raise SyntaxError("Invalid function declaration")
+    while current_token(tokens)[0] != "EOF":
+        token = current_token(tokens)
+        if token[0] == "KEYWORD" and token[1] == "struct":
+            if declStruct(tokens):
+                continue  # Restart the loop to check all cases
+            elif declVar(tokens):
+                    continue
             else:
-                if not parse_decl_var(tokens):
-                    raise SyntaxError("Invalid variable declaration")
+                raise SyntaxError(f"Line {token[2]}: Unexpected token {token}")
+        if token[0] == "KEYWORD" and token[1] in ["int", "char", "double", "void"]:
+            if declFunc2(tokens):  # Check for function declaration
+                continue  # Restart the loop
+            if declVar(tokens):  # Check for variable declaration
+                continue  # Restart the loop
+            raise SyntaxError("Invalid declaration")
         else:
-            raise SyntaxError(f"Line {current_token(tokens)[2]}: Unexpected token {current_token(tokens)}")
-    consume(tokens, "END")
+            raise SyntaxError(f"Line {token[2]}: Unexpected token {token}")
+    if not consume(tokens, "EOF"):
+        raise SyntaxError("Expected 'EOF' token at the end of the program")
     print("✅ Program parsed successfully!")
 
-def is_func_decl(tokens):
-    # Check if next two tokens are ID followed by (
-    return (
-        current_index + 2 < len(tokens) and
-        tokens[current_index + 1][0] == "IDENTIFIER" and
-        tokens[current_index + 2] == ("DELIMITER", "(", tokens[current_index + 2][2])
-    )
-
 # ---------- declStruct: STRUCT ID LACC declVar* RACC SEMICOLON ----------
-def parse_decl_struct(tokens):
+def declStruct(tokens):
+    global current_index
+    clone_current_index = current_index
+    print (f"DeclStruct called {current_index}")
     if not consume(tokens, "KEYWORD", "struct"): return False
     if not consume(tokens, "IDENTIFIER"): raise SyntaxError("Missing struct name")
-    if not consume(tokens, "DELIMITER", "{"): raise SyntaxError("Expected '{'")
-    while parse_decl_var(tokens): pass
+    if not consume(tokens, "DELIMITER", "{"):
+        current_index = clone_current_index
+        return False
+        #raise SyntaxError("Expected '{'")
+    while declVar(tokens): pass
     if not consume(tokens, "DELIMITER", "}"): raise SyntaxError("Expected '}'")
     if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';'")
     return True
 
 # ---------- declVar: typeBase ID arrayDecl? ( COMMA ID arrayDecl? )* SEMICOLON ----------
-def parse_decl_var(tokens):
-    if not parse_type_base(tokens): return False
+def declVar(tokens):
+    global current_index
+    print (f"DeclVar called {current_index}")
+    if not typeBase(tokens): return False
     if not consume(tokens, "IDENTIFIER"): raise SyntaxError("Missing variable name")
-    parse_array_decl(tokens)
+    arrayDecl(tokens)
     while consume(tokens, "DELIMITER", ","):
         if not consume(tokens, "IDENTIFIER"): raise SyntaxError("Missing variable name after ','")
-        parse_array_decl(tokens)
+        arrayDecl(tokens)
     if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';'")
+    print (f"DeclVar exiting {current_index}")
     return True
 
 # ---------- typeBase: INT | DOUBLE | CHAR | STRUCT ID ----------
-def parse_type_base(tokens):
+def typeBase(tokens):
     if consume(tokens, "KEYWORD", "int"): return True
     if consume(tokens, "KEYWORD", "double"): return True
     if consume(tokens, "KEYWORD", "char"): return True
@@ -69,64 +74,97 @@ def parse_type_base(tokens):
     return False
 
 # ---------- arrayDecl: LBRACKET expr? RBRACKET ----------
-def parse_array_decl(tokens):
+def arrayDecl(tokens):
     if not consume(tokens, "DELIMITER", "["): return False
-    expr(tokens)  # optional
+    expr(tokens)  # Optional expression
     if not consume(tokens, "DELIMITER", "]"):
         raise SyntaxError("Expected ']'")
     return True
 
 # ---------- typeName: typeBase arrayDecl? ----------
-def parse_type_name(tokens):
-    if not parse_type_base(tokens): return False
-    parse_array_decl(tokens)
+def typeName(tokens):
+    if not typeBase(tokens): return False
+    arrayDecl(tokens)
     return True
 
 # ---------- declFunc: ( typeBase MUL? | VOID ) ID ( funcArg ( , funcArg )* )? ) stmCompound ----------
-def parse_decl_func(tokens):
-    if not (consume(tokens, "KEYWORD", "void") or parse_type_base(tokens)):
+def declFunc(tokens):
+    print (f"DeclFunc called {current_index}")
+    if not (consume(tokens, "KEYWORD", "void") or typeBase(tokens)):
         return False
     consume(tokens, "OPERATOR", "*")  # optional
     if not consume(tokens, "IDENTIFIER"): raise SyntaxError("Expected function name")
     if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Expected '('")
-    if parse_func_arg(tokens):
+    if funcArg(tokens):
         while consume(tokens, "DELIMITER", ","):
-            if not parse_func_arg(tokens): raise SyntaxError("Invalid function argument")
+            if not funcArg(tokens): raise SyntaxError("Invalid function argument")
     if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Expected ')'")
-    parse_stm_compound(tokens)
+    stmCompound(tokens)
+    return True
+
+def declFunc2(tokens):
+    global current_index
+    print (f"DeclFunc called {current_index}")
+    clone_current_index = current_index
+    if not (consume(tokens, "KEYWORD", "void") or typeBase(tokens)):
+        current_index = clone_current_index
+        return False
+    consume(tokens, "OPERATOR", "*")  # optional
+    if not consume(tokens, "IDENTIFIER"):
+        current_index = clone_current_index
+        return  False
+        #raise SyntaxError("Expected function name")
+    if not consume(tokens, "DELIMITER", "("):
+        current_index = clone_current_index
+        return False
+        #raise SyntaxError("Expected '('")
+    if funcArg(tokens):
+        while consume(tokens, "DELIMITER", ","):
+            if not funcArg(tokens):
+                current_index = clone_current_index
+                return False
+                #raise SyntaxError("Invalid function argument")
+    if not consume(tokens, "DELIMITER", ")"):
+        current_index = clone_current_index
+        return False
+        #raise SyntaxError("Expected ')'")
+    stmCompound(tokens)
     return True
 
 # ---------- funcArg: typeBase ID arrayDecl? ----------
-def parse_func_arg(tokens):
-    if not parse_type_base(tokens): return False
+def funcArg(tokens):
+    if not typeBase(tokens): return False
     if not consume(tokens, "IDENTIFIER"): raise SyntaxError("Expected argument name")
-    parse_array_decl(tokens)
+    arrayDecl(tokens)
     return True
 
 # ---------- stmCompound: { (declVar | stm)* } ----------
-def parse_stm_compound(tokens):
+def stmCompound(tokens):
     if not consume(tokens, "DELIMITER", "{"): return False
     while True:
-        if not (parse_decl_var(tokens) or parse_stm(tokens)): break
+        if tokens[current_index][1] == "}": break
+        if not (declVar(tokens) or stm(tokens)):  # Attempt to parse declVar or stm
+            raise SyntaxError(f"Unexpected token {tokens[current_index]} inside compound statement")
     if not consume(tokens, "DELIMITER", "}"): raise SyntaxError("Expected '}'")
     return True
 
-# ---------- stm: ... ----------
-def parse_stm(tokens):
-    if parse_stm_compound(tokens): return True
+# ---------- stm: all statement forms ----------
+def stm(tokens):
+    print (f"Current token: {tokens[current_index]}")
+    if stmCompound(tokens): return True
     if consume(tokens, "KEYWORD", "if"):
         if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Expected '(' after 'if'")
-        if not expr(tokens): raise SyntaxError("Expected expression in if condition")
-        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Expected ')' after condition")
-        parse_stm(tokens)
+        if not expr(tokens): raise SyntaxError("Expected expression in 'if'")
+        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Expected ')' after 'if'")
+        stm(tokens)
         if consume(tokens, "KEYWORD", "else"):
-            parse_stm(tokens)
+            stm(tokens)
         return True
     if consume(tokens, "KEYWORD", "while"):
         if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Expected '(' after 'while'")
-        if not expr(tokens): raise SyntaxError("Expected expression in while")
-        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Expected ')' after while")
-        parse_stm(tokens)
+        if not expr(tokens): raise SyntaxError("Expected expression in 'while'")
+        if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Expected ')' after 'while'")
+        stm(tokens)
         return True
     if consume(tokens, "KEYWORD", "for"):
         if not consume(tokens, "DELIMITER", "("): raise SyntaxError("Expected '(' after 'for'")
@@ -136,18 +174,19 @@ def parse_stm(tokens):
         if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';'")
         expr(tokens)  # optional
         if not consume(tokens, "DELIMITER", ")"): raise SyntaxError("Expected ')'")
-        parse_stm(tokens)
+        stm(tokens)
         return True
     if consume(tokens, "KEYWORD", "break"):
-        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';' after break")
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';' after 'break'")
         return True
     if consume(tokens, "KEYWORD", "return"):
         expr(tokens)  # optional
-        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';' after return")
+        if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';' after 'return'")
         return True
-    expr(tokens)  # optional expression
+    expr(tokens)  # optional
     if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';'")
     return True
+
 
 
 def parse_program(tokens, exit_token):
@@ -338,27 +377,6 @@ def exprPrimary(tokens):
             raise SyntaxError(f"Line {tokens[current_index][2]}: Expected ')' after expression")
         return True
     return False
-
-def typeName(tokens):
-    if not typeBase(tokens):
-        return False
-    #arrayDecl(tokens)  # optional, you could check its result if needed
-    return True
-
-def typeBase(tokens):
-    global current_index
-    if consume(tokens, "KEYWORD", "int") or \
-       consume(tokens, "KEYWORD", "double") or \
-       consume(tokens, "KEYWORD", "char"):
-        return True
-    if consume(tokens, "KEYWORD", "struct"):
-        if not consume(tokens, "IDENTIFIER"):
-            raise SyntaxError(f"Line {tokens[current_index][2]}: Expected struct name")
-        return True
-    return False
-
-
-
 
 def parse_function_call_parameters(tokens):
     global current_index
