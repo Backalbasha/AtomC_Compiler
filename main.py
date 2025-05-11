@@ -1,5 +1,5 @@
 from lexical_analyzer import tokenize
-from syntactic_analyzer import parse_program, parse_unit, arrayDecl, declStruct, declVar, typeBase
+from syntactic_analyzer import parse_unit, arrayDecl, declStruct, declVar, typeBase
 import syntactic_analyzer
 if __name__ == "__main__":
     with open("input2.c", 'r') as file:
