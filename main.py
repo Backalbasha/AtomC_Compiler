@@ -1,8 +1,8 @@
 from lexical_analyzer import tokenize
-from syntactic_analyzer import parse_unit, arrayDecl, declStruct, declVar, typeBase
+from syntactic_analyzer import parse_unit, arrayDecl, declStruct, declVar, typeBase, print_symbol_table
 import syntactic_analyzer
 if __name__ == "__main__":
-    with open("input2.c", 'r') as file:
+    with open("input3.c", 'r') as file:
         code = file.read()
 
     token_list = tokenize(code)
@@ -20,3 +20,5 @@ if __name__ == "__main__":
 
     print('\nfinished')
     print(token_list[syntactic_analyzer.current_index-1])
+
+    print_symbol_table()
