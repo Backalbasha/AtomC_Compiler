@@ -49,7 +49,10 @@ def addSymbol(name, cls, type_, mem, scope=None):
     scope = scope or symbols
     if any(s.name == name and s.depth == crtDepth for s in scope):
         raise SyntaxError(f"Symbol redefinition: {name}")
-    sym = Symbol(name, cls, type_, mem, crtDepth)
+    if (mem == MEM_GLOBAL):
+        sym = Symbol(name, cls, type_, mem, 0)  # Global symbols have depth 0
+    else:
+        sym = Symbol(name, cls, type_, mem, crtDepth)
     scope.append(sym)
     return sym
 
@@ -317,8 +320,8 @@ def funcArg(tokens):
     # Define in global scope for semantic validation
     s = addSymbol(name, CLS_VAR, t, MEM_ARG)
     # Also save to the current function's arg list
-    print(f"Adding argument {name} of type {t.typeBase} to function {crtFunc.name} at depth {crtDepth + 1}")
-    arg = Symbol(name, CLS_VAR, t, MEM_ARG, crtDepth + 1 )
+    print(f"Adding argument {name} of type {t.typeBase} to function {crtFunc.name} at depth {crtDepth }")
+    arg = Symbol(name, CLS_VAR, t, MEM_ARG, crtDepth  )
     crtFunc.args.append(arg)
 
     return True
@@ -328,13 +331,13 @@ def funcArg(tokens):
 def stmCompound(tokens):
     global crtDepth
     if not consume(tokens, "DELIMITER", "{"): return False
-    crtDepth += 1
+    #crtDepth += 1
     while True:
         if tokens[current_index][1] == "}": break
         if not (declVar(tokens) or stm(tokens)):
             raise SyntaxError(f"Unexpected token {tokens[current_index]} inside compound statement")
     if not consume(tokens, "DELIMITER", "}"): raise SyntaxError("Expected '}'")
-    crtDepth -= 1
+    #crtDepth -= 1
     return True
 
 # ---------- stm: all statement forms ----------

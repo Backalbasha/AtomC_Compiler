@@ -6,7 +6,7 @@ struct Pt		points[20/4+5];
 
 int sum( int x, int y)
 {
-	int	 i,v[5],s, x;
+	int	 i,v[5],s;
 	int a;
 	s=0;
 	if (a == 4)
