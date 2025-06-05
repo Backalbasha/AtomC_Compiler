@@ -197,7 +197,7 @@ def addVar(name, type_):
 
 
 def print_symbol_table():
-    print("\n🔍 SYMBOL TABLE DUMP:")
+    print("\n SYMBOL TABLE DUMP:")
     print("-" * 60)
     for sym in symbols:
         print(f"Name: {sym.name}")
@@ -264,7 +264,7 @@ def parse_unit(tokens):
             raise SyntaxError(f"Line {token[2]}: Unexpected token {token}")
     if not consume(tokens, "EOF"):
         raise SyntaxError("Expected 'EOF' token at the end of the program")
-    print("✅ Program parsed successfully!")
+    print(" Program parsed successfully!")
 
 
 # ---------- declStruct: STRUCT ID LACC declVar* RACC SEMICOLON ----------
@@ -584,9 +584,10 @@ def stm(tokens):
         if not consume(tokens, "DELIMITER", ";"): raise SyntaxError("Expected ';' after 'return'")
         return True
 
-    expr(tokens)  # optional
+    expr_result = expr(tokens)
+    if not expr_result:
+        raise SyntaxError(f"Line {tokens[current_index][2]}: Expected expression before ';'")
     if not consume(tokens, "DELIMITER", ";"):
-        print(f"Line {tokens[current_index][2]}: {tokens[current_index]}")
         raise SyntaxError("Expected ';'")
     return True
 
@@ -903,7 +904,7 @@ def exprPostfix(tokens):
             expr_return_value.isLVal = True
             expr_return_value.isCtVal = False
 
-        elif consume(tokens, "DELIMITER", "."):  # struct access
+        elif consume(tokens, "OPERATOR", "."):  # struct access
             rv = expr_return_value
 
             if rv.type.typeBase != TB_STRUCT:
